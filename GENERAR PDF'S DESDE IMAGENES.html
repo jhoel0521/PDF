@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF con Imágenes</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+  <div class="container">
+    <h1>Crear PDF con Imágenes</h1>
+    
+    <form id="imageForm">
+      <div class="form-group">
+        <label for="images">Seleccionar imágenes:</label>
+        <input type="file" class="form-control-file" id="images" name="images" accept="image/*" multiple>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="generatePDF()">Generar PDF</button>
+    </form>
+  </div>
+
+  <!-- Bootstrap JS (optional, only if you want to use Bootstrap features like modals) -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <!-- jsPDF -->
+  
+  <script type="module" >
+	import jsPDF as  from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js";
+    function generatePDF() {
+      const doc = new jsPDF();
+
+      const imagesInput = document.getElementById('images');
+      const images = imagesInput.files;
+
+      // Loop a través de las imágenes seleccionadas
+      for (let i = 0; i < images.length; i++) {
+        const reader = new FileReader();
+
+        reader.onload = function(event) {
+          const imgData = event.target.result;
+          doc.addImage(imgData, 'JPEG', 10, (i * 100) + 10, 100, 80);
+
+          // Si es la última imagen, guardar el PDF
+          if (i === images.length - 1) {
+            doc.save('documento.pdf');
+          }
+        };
+
+        reader.readAsDataURL(images[i]);
+      }
+    }
+  </script>
+</body>
+</html>

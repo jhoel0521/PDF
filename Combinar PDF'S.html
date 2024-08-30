@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Combinar PDFs</title>
+  <link href="./css/icon.css" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    #pdfDiv {
+      max-width: 100%;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      justify-content: center;
+      align-items: center;
+
+      & {
+        .formImg {
+          max-width: 600px;
+        }
+      }
+    }
+
+    #preview {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      position: relative;
+      width: 200px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      background-color: #fafafa;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .closed {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: #ff6b6b;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .div-btn {
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+    }
+
+    .next,
+    .prev {
+      color: #000000;
+      border: none;
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+
+    .prev {
+      background-color: #007bff;
+      /* border radios en la izquierda  */
+      border-top-left-radius: 5px;
+      border-bottom-left-radius: 5px;
+    }
+
+    .next {
+      background-color: #bfff00;
+      /* border radios en la derecha  */
+      border-top-right-radius: 5px;
+      border-bottom-right-radius: 5px;
+
+    }
+
+    /* primera card */
+    .card:first-child {
+      & .prev {
+        display: none;
+      }
+
+      & .next {
+        border-radius: 5px;
+      }
+    }
+
+    /** última card */
+    .card:last-child {
+      & .next {
+        display: none;
+      }
+
+      & .prev {
+        border-radius: 5px;
+      }
+    }
+
+    .next:hover,
+    .prev:hover {
+      background-color: #0056b3;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin-bottom: 20px;
+    }
+
+    #btn-generar {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    #btn-generar:hover {
+      background-color: #218838;
+    }
+
+    iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+      display: none;
+
+    }
+
+    .success {
+      color: green;
+      display: block !important;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Combinar PDFs</h1>
+  <div id="pdfDiv">
+    <h2>Vista previa</h2>
+    <div id="preview">
+    </div>
+    <div class="formImg">
+      <label for="pdfInput">Selecciona archivos PDF:</label>
+      <input type="file" id="pdfInput" name="pdfFiles[]" accept=".pdf" multiple required>
+      <br>
+      <button type="button" id="btn-generar">Combinar y Descargar</button>
+    </div>
+    <iframe id="result" src="" frameborder="0"></iframe>
+  </div>
+  <!-- Incluyendo la librería PDF.js desde el CDN de Mozilla -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  <!-- Incluyendo la librería PDFLib -->
+  <script src="https://unpkg.com/pdf-lib"></script>
+  <script type="module">
+    const $ = selector => document.querySelector(selector);
+    const btnGenerar = $('#btn-generar');
+    const pdfInput = $('#pdfInput');
+    const listPDF = [];
+    btnGenerar.addEventListener('click', combinarPDFs);
+    pdfInput.addEventListener('change', mostrarPrimeraPaginaComoImg);
+
+    async function mostrarPrimeraPaginaComoImg() {
+      const archivosPDF = pdfInput.files;
+
+      if (archivosPDF.length === 0) {
+        return;
+      }
+      let i = 0;
+      for (const archivo of archivosPDF) {
+        const arrayBuffer = await archivo.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1); // Primera página
+
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale: scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport
+        };
+        await page.render(renderContext).promise;
+
+        const img = new Image();
+        img.src = canvas.toDataURL('image/png');
+        img.width = 200;
+        img.height = 200;
+
+        const fragmento = document.createElement('div');
+        fragmento.className = 'card';
+        fragmento.id = 'fragment' + i;
+        fragmento.setAttribute('data-order', i);
+        const cerrar = document.createElement('button');
+        cerrar.className = 'closed';
+        cerrar.textContent = 'x';
+        fragmento.appendChild(cerrar);
+        fragmento.appendChild(img);
+        const divBtn = document.createElement('div');
+        divBtn.className = 'div-btn';
+        const next = document.createElement('button');
+        next.className = 'next';
+        next.innerHTML = `<i class="material-icons">arrow_forward</i>`;
+        const prev = document.createElement('button');
+        prev.className = 'prev';
+        prev.innerHTML = `<i class="material-icons">arrow_back</i>`;
+        divBtn.appendChild(prev);
+        divBtn.appendChild(next);
+        fragmento.appendChild(divBtn);
+
+
+        $('#preview').appendChild(fragmento);
+        const fragment = $('#fragment' + i);
+        cerrar.addEventListener('click', () => {
+          // removemos el del listPDF de order==i
+          const index = listPDF.findIndex(item => item.order === i);
+          listPDF.splice(index, 1);
+          fragment.remove();
+        });
+        next.addEventListener('click', () => {
+          // seleccionamos el fragment 
+          const order = parseInt(fragment.getAttribute('data-order'));
+          const key = listPDF.findIndex(item => item.order == order);
+
+          if (listPDF[key + 1]) {
+            exchange(key, key + 1);
+            const fragmentNext = listPDF[key + 1]?.fragment;
+            if (fragmentNext) {
+              listPDF[key].fragment.remove();
+              fragmentNext.after(fragment);
+            }
+          }
+        });
+        prev.addEventListener('click', () => {
+          // seleccionamos el fragment 
+          const order = parseInt(fragment.getAttribute('data-order'));
+          const key = listPDF.findIndex(item => item.order == order);
+          if (listPDF[key - 1]) {
+            exchange(key, key - 1);
+            const fragmentPrev = listPDF[key - 1]?.fragment;
+            if (fragmentPrev) {
+              listPDF[key].fragment.remove();
+              fragmentPrev.before(fragment);
+            }
+          }
+        });
+
+        listPDF.push({ 'order': i, 'pdf': arrayBuffer, 'fragment': fragment });
+        i++;
+      }
+      pdfInput.value = '';
+    }
+    function exchange(keyA, keyB) {
+      const order = listPDF[keyA].order;
+      listPDF[keyA].order = listPDF[keyB].order;
+      listPDF[keyB].order = order;
+
+    }
+    async function combinarPDFs() {
+      if (listPDF.length === 0) {
+        alert('No hay archivos PDF para combinar');
+        return;
+      }
+
+      // Crear un nuevo documento PDF combinado
+      const pdfCombinadoDoc = await PDFLib.PDFDocument.create();
+
+      // Iterar sobre cada archivo PDF en el orden especificado
+      const generarListPDF = listPDF.sort((a, b) => a.order - b.order);
+      console.log(listPDF, 'listPDF');
+      console.log(generarListPDF, 'generarListPDF');
+
+      for (const { order, pdf } of generarListPDF) {
+        const pdfDoc = await PDFLib.PDFDocument.load(pdf);
+        const paginas = await pdfCombinadoDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        paginas.forEach((pagina) => pdfCombinadoDoc.addPage(pagina));
+      }
+
+      // Guardar el documento combinado como un Blob
+      const pdfCombinadoBytes = await pdfCombinadoDoc.save();
+      const pdfCombinadoBlob = new Blob([pdfCombinadoBytes], { type: 'application/pdf' });
+
+      // preparar el iframe para mostrar el pdf
+      const pdfUrl = URL.createObjectURL(pdfCombinadoBlob);
+      $('#result').src = pdfUrl;
+      $('#result').classList.add('success');
+
+    }
+
+  </script>
+
+</body>
+
+</html>

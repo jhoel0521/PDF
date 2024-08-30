@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Combinar PDFs</title>
+  <!-- icon -->
+  <link rel="icon" href="./icons/pdf.png" type="image/png">
   <link href="./css/icon.css" rel="stylesheet">
   <style>
     *,
@@ -111,6 +113,12 @@
       /* border radios en la izquierda  */
       border-top-left-radius: 5px;
       border-bottom-left-radius: 5px;
+
+      &:hover {
+        background-color: #0056b3;
+        scale: 1.1;
+        transition: 0.3s;
+      }
     }
 
     .next {
@@ -118,6 +126,13 @@
       /* border radios en la derecha  */
       border-top-right-radius: 5px;
       border-bottom-right-radius: 5px;
+
+      &:hover {
+        background-color: #8db600;
+        scale: 1.1;
+        transition: 0.3s;
+
+      }
 
     }
 
@@ -143,10 +158,6 @@
       }
     }
 
-    .next:hover,
-    .prev:hover {
-      background-color: #0056b3;
-    }
 
     label {
       display: block;
@@ -208,9 +219,9 @@
     <iframe id="result" src="" frameborder="0"></iframe>
   </div>
   <!-- Incluyendo la librería PDF.js desde el CDN de Mozilla -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  <script src="/js/pdf.min.js"></script>
   <!-- Incluyendo la librería PDFLib -->
-  <script src="https://unpkg.com/pdf-lib"></script>
+  <script src="/js/pdf-lib.min.js"></script>
   <script type="module">
     const $ = selector => document.querySelector(selector);
     const btnGenerar = $('#btn-generar');
@@ -225,7 +236,7 @@
       if (archivosPDF.length === 0) {
         return;
       }
-      let i = 0;
+      let i = listPDF.length;  // Utiliza el tamaño actual de listPDF para el índice inicial
       for (const archivo of archivosPDF) {
         const arrayBuffer = await archivo.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -271,41 +282,23 @@
         divBtn.appendChild(next);
         fragmento.appendChild(divBtn);
 
-
         $('#preview').appendChild(fragmento);
         const fragment = $('#fragment' + i);
         cerrar.addEventListener('click', () => {
-          // removemos el del listPDF de order==i
           const index = listPDF.findIndex(item => item.order === i);
           listPDF.splice(index, 1);
           fragment.remove();
+          actualizarOrden(); // Actualiza el orden después de eliminar
         });
         next.addEventListener('click', () => {
-          // seleccionamos el fragment 
-          const order = parseInt(fragment.getAttribute('data-order'));
-          const key = listPDF.findIndex(item => item.order == order);
-
-          if (listPDF[key + 1]) {
-            exchange(key, key + 1);
-            const fragmentNext = listPDF[key + 1]?.fragment;
-            if (fragmentNext) {
-              listPDF[key].fragment.remove();
-              fragmentNext.after(fragment);
-            }
-          }
+          const miFragmento = next.parentElement.parentElement;
+          const order = parseInt(miFragmento.getAttribute('data-order'));
+          intercambiarFragmentos(order, true);
         });
         prev.addEventListener('click', () => {
-          // seleccionamos el fragment 
-          const order = parseInt(fragment.getAttribute('data-order'));
-          const key = listPDF.findIndex(item => item.order == order);
-          if (listPDF[key - 1]) {
-            exchange(key, key - 1);
-            const fragmentPrev = listPDF[key - 1]?.fragment;
-            if (fragmentPrev) {
-              listPDF[key].fragment.remove();
-              fragmentPrev.before(fragment);
-            }
-          }
+          const miFragmento = next.parentElement.parentElement;
+          const order = parseInt(miFragmento.getAttribute('data-order'));
+          intercambiarFragmentos(order, false);
         });
 
         listPDF.push({ 'order': i, 'pdf': arrayBuffer, 'fragment': fragment });
@@ -313,11 +306,36 @@
       }
       pdfInput.value = '';
     }
-    function exchange(keyA, keyB) {
-      const order = listPDF[keyA].order;
-      listPDF[keyA].order = listPDF[keyB].order;
-      listPDF[keyB].order = order;
+    function actualizarOrden() {
+      listPDF.forEach((item, index) => {
+        item.order = index;
+        item.fragment.setAttribute('data-order', index);
+        item.fragment.id = 'fragment' + index;
+      });
+    }
 
+    function intercambiarFragmentos(order, next) {
+      const keyA = listPDF.findIndex(item => item.order === order);
+      if (keyA === -1) return;
+      const keyB = next ? keyA + 1 : keyA - 1;
+      if (keyB < 0 || keyB >= listPDF.length) return;
+
+      // Intercambia las posiciones de los elementos en el DOM
+      const fragmentA = listPDF[keyA].fragment;
+      const fragmentB = listPDF[keyB].fragment;
+
+      // Si keyA es menor que keyB, fragmentB irá antes de fragmentA, si no, irá después
+      if (next) {
+        fragmentB.after(fragmentA);
+      } else {
+        fragmentB.before(fragmentA);
+      }
+
+      // Intercambia los elementos en el array listPDF
+      [listPDF[keyA], listPDF[keyB]] = [listPDF[keyB], listPDF[keyA]];
+
+      // Actualiza el atributo data-order e ID
+      actualizarOrden();
     }
     async function combinarPDFs() {
       if (listPDF.length === 0) {
@@ -325,32 +343,24 @@
         return;
       }
 
-      // Crear un nuevo documento PDF combinado
       const pdfCombinadoDoc = await PDFLib.PDFDocument.create();
-
-      // Iterar sobre cada archivo PDF en el orden especificado
       const generarListPDF = listPDF.sort((a, b) => a.order - b.order);
-      console.log(listPDF, 'listPDF');
-      console.log(generarListPDF, 'generarListPDF');
 
-      for (const { order, pdf } of generarListPDF) {
+      for (const { pdf } of generarListPDF) {
         const pdfDoc = await PDFLib.PDFDocument.load(pdf);
         const paginas = await pdfCombinadoDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
         paginas.forEach((pagina) => pdfCombinadoDoc.addPage(pagina));
       }
 
-      // Guardar el documento combinado como un Blob
       const pdfCombinadoBytes = await pdfCombinadoDoc.save();
       const pdfCombinadoBlob = new Blob([pdfCombinadoBytes], { type: 'application/pdf' });
 
-      // preparar el iframe para mostrar el pdf
       const pdfUrl = URL.createObjectURL(pdfCombinadoBlob);
       $('#result').src = pdfUrl;
       $('#result').classList.add('success');
-
     }
-
   </script>
+
 
 </body>
 
